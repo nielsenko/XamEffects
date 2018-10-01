@@ -9,7 +9,7 @@ using Xamarin.Forms.Platform.Android;
 using XamEffects;
 using XamEffects.Droid;
 using XamEffects.Droid.Collectors;
-using Color = Xamarin.Forms.Color;
+using Color = Android.Graphics.Color;
 using View = Android.Views.View;
 
 [assembly: ResolutionGroupName("XamEffects")]
@@ -25,7 +25,6 @@ namespace XamEffects.Droid
 		}
 
         private View _view;
-        private Android.Graphics.Color _color;
         private RippleDrawable _ripple;
         private FrameLayout _viewOverlay;
 
@@ -53,7 +52,6 @@ namespace XamEffects.Droid
 	        Container.LayoutChange += ViewOnLayoutChange;
 
             AddRipple();
-            
 			_view.Touch += OnTouch;
 
             UpdateEffectColor();
@@ -61,8 +59,8 @@ namespace XamEffects.Droid
         
         protected override void OnDetached()
         {
-			RemoveRipple();
 			_view.Touch -= OnTouch;
+			RemoveRipple();
 			ViewOverlayCollector.TryDelete(Container, this);
 		}
 
@@ -86,34 +84,23 @@ namespace XamEffects.Droid
             base.OnElementPropertyChanged(e);
 
             if (e.PropertyName == TouchEffect.ColorProperty.PropertyName)
-            {
                 UpdateEffectColor();
-            }
         }
 
-        private void UpdateEffectColor()
+		private Color GetAndroidColor()
+		{
+			var color = TouchEffect.GetColor(Element);
+			var androidColor = color.ToAndroid();
+			androidColor.A = 80; // perhaps a bit arbitrary
+			return androidColor;
+		}
+
+		private void UpdateEffectColor() => _ripple.SetColor(GetPressedColorSelector(GetAndroidColor()));
+
+		private void AddRipple()
         {
-            var color = TouchEffect.GetColor(Element);
-            if (color == Color.Default)
-            {
-                return;
-            }
-            _color = color.ToAndroid();
-            _color.A = 80;
-
-			_ripple.SetColor(GetPressedColorSelector(_color));
-        }
-
-        private void AddRipple()
-        {
-            var color = TouchEffect.GetColor(Element);
-            if (color == Color.Default)
-                return;
-
-			_color = color.ToAndroid();
-            _color.A = 80;
-
-            _viewOverlay.Background = CreateRipple(color.ToAndroid());
+			_ripple = CreateRipple(GetAndroidColor());
+			_viewOverlay.Background = _ripple;
 			Container.AddView(_viewOverlay);
 		}
 
@@ -124,31 +111,30 @@ namespace XamEffects.Droid
             _ripple = null;
         }
 
-        private RippleDrawable CreateRipple(Android.Graphics.Color color)
+        private RippleDrawable CreateRipple(Color color)
         {
             if (Element is Layout)
             {
-                var mask = new ColorDrawable(Android.Graphics.Color.White);
+                var mask = new ColorDrawable(Color.White);
                 return _ripple = new RippleDrawable(GetPressedColorSelector(color), null, mask);
             }
 
             var back = _view.Background;
             if (back == null)
             {
-                var mask = new ColorDrawable(Android.Graphics.Color.White);
+                var mask = new ColorDrawable(Color.White);
                 return _ripple = new RippleDrawable(GetPressedColorSelector(color), null, mask);
             }
-            else if (back is RippleDrawable)
+            
+			if (back is RippleDrawable)
             {
                 _ripple = (RippleDrawable) back.GetConstantState().NewDrawable();
                 _ripple.SetColor(GetPressedColorSelector(color));
 
                 return _ripple;
             }
-            else
-            {
-                return _ripple = new RippleDrawable(GetPressedColorSelector(color), back, null);
-            }
+
+			return _ripple = new RippleDrawable(GetPressedColorSelector(color), back, null);
         }
 
         private static ColorStateList GetPressedColorSelector(int pressedColor)
@@ -178,7 +164,7 @@ namespace XamEffects.Droid
 
 		private void ViewOnLayoutChange(object sender, View.LayoutChangeEventArgs layoutChangeEventArgs)
 	    {
-		    var group = ((ViewGroup)sender);
+		    var group = (ViewGroup)sender;
 			_viewOverlay.Right = group.Width;
 		    _viewOverlay.Bottom = group.Height;
 	    }
